@@ -1,21 +1,40 @@
-name: Docker run from Docker Hub
+# .github/workflows/pull-image.yml
+name: Pull Docker Hub image
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Docker tag to pull"
+        required: true
+        default: "latest"
 
 jobs:
-  run:
+  pull:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Set image env
+        run: echo "IMAGE=venki2pt/starbucks:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
 
-      # Login only if the image is private
+      # Uncomment if the repo is private
+      - name: Docker login (private repos)
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Check tag exists
+        run: |
+          if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "❌ Tag not found on Docker Hub: $IMAGE"
+            echo "👉 Use one of the actual tags listed at:"
+            echo "   https://hub.docker.com/r/venki2pt/starbucks/tags"
+            exit 1
+          fi
+
       - name: Pull image
-        run: docker pull venki2pt/starbucks:tagname
+        run: docker pull "$IMAGE"
 
-
-      - name: Run the docker container
-        run: docker pull venki2pt/starbucks:tagname
+      - name: Run a command in the image (example)
+        run: docker run --rm "$IMAGE" echo "Image pulled OK"
